@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 
 class MapsService {
 
-  static const String googleApiKey = "YOUR_GOOGLE_API_KEY";
+  static const String googleApiKey = "AIzaSyDclhTzs0uMcg-9rQ5_6UYjvu7FKqHh-mY";
 
   /// Check if location services enabled
   Future<bool> isLocationEnabled() async {
@@ -146,18 +146,46 @@ class MapsService {
   /// Search places using Google Places API
   Future<List<Map<String, dynamic>>> searchPlaces(String query) async {
 
-    final url =
-        "https://maps.googleapis.com/maps/api/place/textsearch/json?query=$query&key=$googleApiKey";
+    final url = "https://places.googleapis.com/v1/places:searchText";
 
-    final response = await http.get(Uri.parse(url));
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": googleApiKey,
+        "X-Goog-FieldMask":
+        "places.id,places.displayName,places.formattedAddress,places.location",
+      },
+      body: jsonEncode({
+        "textQuery": query,
+      }),
+    );
+
+    final data = json.decode(response.body);
+
+    debugPrint("NEW API RESPONSE: ${response.body}");
 
     if (response.statusCode == 200) {
-      final data = json.decode(response.body);
 
-      return List<Map<String, dynamic>>.from(data['results']);
+      final List results = data['places'] ?? [];
+
+      return results.map<Map<String, dynamic>>((place) {
+        return {
+          "place_id": place['id'],
+          "name": place['displayName']['text'],
+          "formatted_address": place['formattedAddress'],
+          "geometry": {
+            "location": {
+              "lat": place['location']['latitude'],
+              "lng": place['location']['longitude'],
+            }
+          }
+        };
+      }).toList();
+
+    } else {
+      throw Exception(data['error'] ?? "Places API error");
     }
-
-    return [];
   }
 
   /// Get LatLng from place result
